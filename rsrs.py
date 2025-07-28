@@ -7,9 +7,9 @@ import re
 from datetime import datetime, timedelta
 
 # 设置全局字体
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'Microsoft YaHei']
-plt.rcParams['axes.unicode_minus'] = False
-st.set_page_config(layout="wide")
+#plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'Microsoft YaHei']
+#plt.rcParams['axes.unicode_minus'] = False
+#st.set_page_config(layout="wide")
 
 # 指数代码映射表
 index_map = {
