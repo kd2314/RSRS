@@ -9,7 +9,7 @@ import re
 from datetime import datetime, timedelta
 
 # 1. 指定中文字体路径（相对路径）
-font_path = "./fonts/SimHei.ttf"  # 替换为你的字体路径
+font_path = "./fonts/simhei.ttf"  # 替换为你的字体路径
 
 # 2. 动态添加字体
 font_prop = fm.FontProperties(fname=font_path)
