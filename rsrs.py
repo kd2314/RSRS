@@ -20,11 +20,6 @@ plt.rcParams["font.family"] = font_prop.get_name()  # 使用字体名称
 plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
 st.set_page_config(layout="wide")
 
-# 设置全局字体
-#plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'Microsoft YaHei']
-#plt.rcParams['axes.unicode_minus'] = False
-#st.set_page_config(layout="wide")
-
 # 指数代码映射表
 index_map = {
     "中证1000": "sh000852",
