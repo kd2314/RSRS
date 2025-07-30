@@ -71,10 +71,11 @@ def fetch_index_data(index_code):
 
 def calculate_beta_and_signals(data, N, M, buy_thre, sell_thre, use_ma_filter):
     data2 = pd.DataFrame()
+    trade_records = []  # 存储交易信号的列表
 
     if len(data) < M:
         st.error(f"数据不足！需要 {M} 条，当前 {len(data)} 条")
-        return data2, buy_thre, sell_thre
+        return data2, buy_thre, sell_thre, trade_records
 
     try:
         # 数据预处理
@@ -128,16 +129,28 @@ def calculate_beta_and_signals(data, N, M, buy_thre, sell_thre, use_ma_filter):
                 data2.loc[i, 'flag'] = 1
                 data2.loc[i, 'position'] = 1  # 当日即建仓
                 position = 1
+                # 记录买入信号
+                trade_records.append({
+                    'date': data2.loc[i, 'trade_date'],
+                    'signal': 'buy',
+                    'price': data2.loc[i, 'close']
+                })
             elif position == 1 and std_score < sell_thre:
                 data2.loc[i, 'flag'] = -1
                 data2.loc[i, 'position'] = 0  # 当日即平仓
                 position = 0
+                # 记录卖出信号
+                trade_records.append({
+                    'date': data2.loc[i, 'trade_date'],
+                    'signal': 'sell',
+                    'price': data2.loc[i, 'close']
+                })
             else:
                 data2.loc[i, 'position'] = position  # 维持当前仓位
 
     except Exception as e:
         st.error(f"计算错误: {str(e)}")
-    return data2, buy_thre, sell_thre
+    return data2, buy_thre, sell_thre, trade_records
 
 
 def calculate_strategy_performance(processed_data):
@@ -174,6 +187,81 @@ def calculate_strategy_performance(processed_data):
     }
 
 
+def calculate_trade_performance(trade_records, data):
+    """计算交易信号表现（只计算买入信号的收益率）"""
+    if not trade_records or len(trade_records) < 1:
+        return []
+
+    # 按时间排序交易记录
+    sorted_trades = sorted(trade_records, key=lambda x: x['date'])
+    current_buy = None
+    trade_performance = []
+
+    # 获取最新收盘价和日期
+    last_date = data['trade_date'].iloc[-1]
+    last_close = data['close'].iloc[-1]
+
+    for trade in sorted_trades:
+        if trade['signal'] == 'buy':
+            # 如果已有未平仓的买入，先处理前一个
+            if current_buy is not None:
+                # 计算前一个买入的收益率（到当前买入日）
+                buy_price = current_buy['price']
+                sell_price = trade['price']
+                return_pct = (sell_price / buy_price - 1) * 100
+                days_held = (trade['date'] - current_buy['date']).days
+
+                # 添加到结果
+                trade_performance.append({
+                    'signal_date': current_buy['date'],
+                    'signal_type': '买入',
+                    'exit_date': trade['date'],
+                    'return_pct': return_pct,
+                    'days_held': days_held,
+                    'status': '已结束'
+                })
+            current_buy = trade
+        elif trade['signal'] == 'sell' and current_buy is not None:
+            # 计算收益率
+            buy_price = current_buy['price']
+            sell_price = trade['price']
+            return_pct = (sell_price / buy_price - 1) * 100
+            days_held = (trade['date'] - current_buy['date']).days
+
+            # 添加到结果
+            trade_performance.append({
+                'signal_date': current_buy['date'],
+                'signal_type': '买入',
+                'exit_date': trade['date'],
+                'return_pct': return_pct,
+                'days_held': days_held,
+                'status': '已结束'
+            })
+            current_buy = None
+
+    # 处理最后一个未平仓的买入
+    if current_buy is not None:
+        buy_price = current_buy['price']
+        sell_price = last_close
+        return_pct = (sell_price / buy_price - 1) * 100
+        days_held = (last_date - current_buy['date']).days
+
+        trade_performance.append({
+            'signal_date': current_buy['date'],
+            'signal_type': '买入',
+            'exit_date': last_date,
+            'return_pct': return_pct,
+            'days_held': days_held,
+            'status': '持仓中'
+        })
+
+    # 按信号日期排序（最近的在前）
+    trade_performance.sort(key=lambda x: x['signal_date'], reverse=True)
+
+    # 只保留最近的10次交易信号
+    return trade_performance[:10]
+
+
 def main():
     st.markdown('<h1 style="color:#1E90FF; font-size:36px;">多指数RSRS指标分析系统</h1>', unsafe_allow_html=True)
 
@@ -205,7 +293,7 @@ def main():
 
             # 添加计算进度提示
             with st.spinner("计算指标中，请稍候..."):
-                processed_data, buy_thre, sell_thre = calculate_beta_and_signals(
+                processed_data, buy_thre, sell_thre, trade_records = calculate_beta_and_signals(
                     data, N, M, buy_thre, sell_thre, use_ma_filter)
 
             if processed_data.empty:
@@ -279,6 +367,51 @@ def main():
                 ), subset=['信号']
             )
             st.dataframe(styled_table, use_container_width=True, height=380)
+
+            # === 新增：交易信号及收益率表格 ===
+            st.subheader("最近10次买入信号及收益率")
+            trade_performance = calculate_trade_performance(trade_records, processed_data)
+
+            if trade_performance:
+                # 创建表格数据
+                table_data = []
+                for i, trade in enumerate(trade_performance, 1):
+                    # 格式化日期
+                    signal_date = trade['signal_date'].strftime('%Y-%m-%d')
+                    exit_date = trade['exit_date'].strftime('%Y-%m-%d') if not isinstance(trade['exit_date'], str) else \
+                    trade['exit_date']
+
+                    table_data.append({
+                        "序号": i,
+                        "买入日期": signal_date,
+                        "卖出日期": exit_date,
+                        "持有天数": trade['days_held'],
+                        "区间收益率 (%)": trade['return_pct'],
+                        "状态": trade['status']
+                    })
+
+                # 创建DataFrame并设置样式
+                df_trades = pd.DataFrame(table_data)
+
+                # 设置样式函数：正收益红色，负收益绿色
+                def color_return(val):
+                    if val > 0:
+                        color = 'red'
+                    elif val < 0:
+                        color = 'green'
+                    else:
+                        color = 'black'
+                    return f'color: {color}; font-weight: bold'
+
+                # 应用样式
+                styled_trades = df_trades.style.format({
+                    '区间收益率 (%)': '{:.2f}%'
+                }).applymap(color_return, subset=['区间收益率 (%)'])
+
+                # 显示表格
+                st.dataframe(styled_trades, height=400)
+            else:
+                st.warning("未发现交易信号")
 
             # === 策略表现统计 ===
             st.subheader("策略表现统计")
