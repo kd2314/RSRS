@@ -18,6 +18,7 @@ fm.fontManager.addfont(font_path)
 # 3. 全局设置中文字体
 plt.rcParams["font.family"] = font_prop.get_name()  # 使用字体名称
 plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
+st.set_page_config(layout="wide")
 
 # 设置全局字体
 #plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'Microsoft YaHei']
