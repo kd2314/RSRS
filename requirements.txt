@@ -1,8 +1,0 @@
-streamlit
-akshare
-pandas
-numpy
-plotly
-scipy
-matplotlib
-fonttools
